@@ -3,11 +3,12 @@
 // 'use client';
 
 // import { useEffect, useState } from "react";
+// import confetti from "canvas-confetti"; // 🎉 add this
 
 // // Utility to save quiz result to localStorage
 // function saveQuizResult(result) {
 //   const existing = JSON.parse(localStorage.getItem("quizHistory") || "[]");
-//   existing.unshift(result); // Add new result at beginning
+//   existing.unshift(result); 
 //   localStorage.setItem("quizHistory", JSON.stringify(existing));
 // }
 
@@ -23,15 +24,30 @@
 //   const finishQuiz = () => {
 //     setIsOver(true);
 
-//     const result = {
-//       score,
-//       total: flashcards.length,
-//       timeLeft,
-//       date: new Date().toISOString(),
-//     };
+//     // ✅ ensure we use the latest score value
+//     setScore(prevScore => {
+//       const finalScore = prevScore;
+//       const result = {
+//         score: finalScore,
+//         total: flashcards.length,
+//         timeLeft,
+//         date: new Date().toISOString(),
+//       };
 
-//     saveQuizResult(result);
-//     onEnd?.(score);
+//       saveQuizResult(result);
+//       onEnd?.(finalScore);
+
+//       // 🎉 trigger confetti if score >= half
+//       if (finalScore >= flashcards.length / 2) {
+//         confetti({
+//           particleCount: 150,
+//           spread: 70,
+//           origin: { y: 0.6 }
+//         });
+//       }
+
+//       return finalScore;
+//     });
 //   };
 
 //   // Timer and end check
@@ -96,23 +112,47 @@
 // }
 
 
+
 'use client';
 
 import { useEffect, useState } from "react";
-import confetti from "canvas-confetti"; // 🎉 add this
+import confetti from "canvas-confetti";
 
-// Utility to save quiz result to localStorage
-function saveQuizResult(result) {
-  const existing = JSON.parse(localStorage.getItem("quizHistory") || "[]");
-  existing.unshift(result); 
+// ---------- TYPES ----------
+export interface Flashcard {
+  id: string | number;
+  question: string;
+  answer: string;
+  options: string[];
+}
+
+export interface TimedQuizProps {
+  flashcards: Flashcard[];
+  duration: number;
+  onEnd?: (score: number) => void;
+}
+
+interface QuizResult {
+  score: number;
+  total: number;
+  timeLeft: number;
+  date: string;
+}
+
+// ---------- HELPERS ----------
+function saveQuizResult(result: QuizResult): void {
+  if (typeof window === "undefined") return;
+  const existing: QuizResult[] = JSON.parse(localStorage.getItem("quizHistory") || "[]");
+  existing.unshift(result);
   localStorage.setItem("quizHistory", JSON.stringify(existing));
 }
 
-export default function TimedQuiz({ flashcards, duration, onEnd }) {
-  const [timeLeft, setTimeLeft] = useState(duration);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [isOver, setIsOver] = useState(false);
+// ---------- COMPONENT ----------
+export default function TimedQuiz({ flashcards, duration, onEnd }: TimedQuizProps) {
+  const [timeLeft, setTimeLeft] = useState<number>(duration);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [score, setScore] = useState<number>(0);
+  const [isOver, setIsOver] = useState<boolean>(false);
 
   const currentCard = flashcards[currentIndex];
 
@@ -120,10 +160,10 @@ export default function TimedQuiz({ flashcards, duration, onEnd }) {
   const finishQuiz = () => {
     setIsOver(true);
 
-    // ✅ ensure we use the latest score value
+    // use callback to ensure final score is saved
     setScore(prevScore => {
       const finalScore = prevScore;
-      const result = {
+      const result: QuizResult = {
         score: finalScore,
         total: flashcards.length,
         timeLeft,
@@ -138,7 +178,7 @@ export default function TimedQuiz({ flashcards, duration, onEnd }) {
         confetti({
           particleCount: 150,
           spread: 70,
-          origin: { y: 0.6 }
+          origin: { y: 0.6 },
         });
       }
 
@@ -160,9 +200,9 @@ export default function TimedQuiz({ flashcards, duration, onEnd }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, currentIndex, isOver]);
+  }, [timeLeft, currentIndex, isOver]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAnswer = (option) => {
+  const handleAnswer = (option: string): void => {
     if (option === currentCard.answer) {
       setScore(prev => prev + 1);
     }
@@ -178,7 +218,9 @@ export default function TimedQuiz({ flashcards, duration, onEnd }) {
     return (
       <div className="text-center mt-10">
         <h2 className="text-2xl font-bold mb-4">Quiz Complete!</h2>
-        <p className="text-lg">Your Score: {score} / {flashcards.length}</p>
+        <p className="text-lg">
+          Your Score: {score} / {flashcards.length}
+        </p>
         <p className="text-sm text-gray-600">Time Left: {timeLeft} seconds</p>
       </div>
     );
@@ -188,10 +230,14 @@ export default function TimedQuiz({ flashcards, duration, onEnd }) {
     <div className="bg-white rounded shadow p-6">
       {/* Progress */}
       <div className="mb-4 text-sm text-gray-600 flex justify-between">
-        <span>Question {currentIndex + 1} of {flashcards.length}</span>
+        <span>
+          Question {currentIndex + 1} of {flashcards.length}
+        </span>
         <span>Time Left: {timeLeft}s</span>
       </div>
+
       <h3 className="text-xl font-bold my-4">{currentCard.question}</h3>
+
       <div className="grid gap-2">
         {currentCard.options.map((option, idx) => (
           <button
