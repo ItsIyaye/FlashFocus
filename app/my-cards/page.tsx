@@ -1,55 +1,50 @@
-
-
 'use client';
 
 import { useEffect, useState } from 'react';
-import EditableFlashCardList, {
-  Flashcard,
-} from '../Components/EditableFlashCardList';
+import EditableFlashCardList, { Flashcard } from '../Components/EditableFlashCardList';
 import FlashCardModal from '../Components/FlashCardModal';
 
 export default function MyCardsPage() {
   const [myCards, setMyCards] = useState<Flashcard[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Load saved cards from localStorage on mount
   useEffect(() => {
-    const saved =
-      (JSON.parse(localStorage.getItem('userFlashcards') || '[]') as Flashcard[]);
-    setMyCards(saved);
+    try {
+      const saved = JSON.parse(localStorage.getItem('userFlashcards') || '[]') as Flashcard[];
+      setMyCards(saved);
+    } catch (err) {
+      console.error('Failed to load flashcards:', err);
+    }
   }, []);
 
+  // Save updated list to localStorage
+  const persistCards = (cards: Flashcard[]) => {
+    setMyCards(cards);
+    localStorage.setItem('userFlashcards', JSON.stringify(cards));
+  };
+
   const handleDelete = (id: string) => {
-    const updated = myCards.filter((c) => c.id !== id);
-    setMyCards(updated);
-    localStorage.setItem('userFlashcards', JSON.stringify(updated));
+    persistCards(myCards.filter(card => card.id !== id));
   };
 
   const handleEdit = (card: Flashcard) => {
-    const q = prompt('Edit question', card.question);
-    const a = prompt('Edit answer', card.answer);
-    const optsRaw = prompt(
-      'Edit options (comma-separated)',
-      card.options.join(', ')
-    );
+    const question = prompt('Edit question', card.question) ?? card.question;
+    const answer = prompt('Edit answer', card.answer) ?? card.answer;
+    const optsRaw = prompt('Edit options (comma-separated)', card.options.join(', '));
 
     const updated: Flashcard = {
       ...card,
-      question: q || card.question,
-      answer: a || card.answer,
-      options: optsRaw
-        ? optsRaw.split(',').map((o) => o.trim())
-        : card.options,
+      question,
+      answer,
+      options: optsRaw ? optsRaw.split(',').map(o => o.trim()) : card.options,
     };
 
-    const next = myCards.map((c) => (c.id === card.id ? updated : c));
-    setMyCards(next);
-    localStorage.setItem('userFlashcards', JSON.stringify(next));
+    persistCards(myCards.map(c => (c.id === card.id ? updated : c)));
   };
 
   const handleCreate = (newCard: Flashcard) => {
-    const updated = [...myCards, newCard];
-    setMyCards(updated);
-    localStorage.setItem('userFlashcards', JSON.stringify(updated));
+    persistCards([...myCards, newCard]);
     setIsModalOpen(false);
   };
 
@@ -76,13 +71,13 @@ export default function MyCardsPage() {
       )}
 
       {isModalOpen && (
-        <FlashCardModal
-          onClose={() => setIsModalOpen(false)}
-          onSave={handleCreate}
-        />
-      )}
+  <FlashCardModal
+    isOpen={isModalOpen}        // ✅ pass isOpen
+    onClose={() => setIsModalOpen(false)}
+    onSave={handleCreate}
+  />
+)}
+
     </div>
   );
 }
-
-
